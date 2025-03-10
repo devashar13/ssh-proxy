@@ -66,7 +66,35 @@ func LoadYAML(path string) (*Config,error){
 	}
 	return &cfg, nil
 
-// func validate(cfg *Config) error{
 
-// }
+
+func validate(cfg *Config) error{
+	if cfg.Upstream.Host == "" {
+		return fmt.Errorf("upstream host not specified")
+	}
+	if cfg.Upstream.Port <= 0 {
+		return fmt.Errorf("invalid upstream port: %d", cfg.Upstream.Port)
+	}
+	if cfg.Upstream.Username == "" {
+		return fmt.Errorf("upstream username not specified")
+	}
+	switch cfg.Upstream.Auth.Type {
+	case "password":
+		if cfg.Upstream.Auth.Password == "" {
+			return fmt.Errorf("upstream password not specified")
+		}
+	case "publickey":
+		if cfg.Upstream.Auth.KeyPath == "" {
+			return fmt.Errorf("upstream key path not specified")
+		}
+	default:
+		return fmt.Errorf("invalid upstream auth type: %s", cfg.Upstream.Auth.Type)
+	}
+	if len(cfg.Users) == 0 {
+		return fmt.Errorf("no users specified")
+	}
+	if cfg.Logging.Directory == "" {
+		return fmt.Errorf("log directory not specified")
+	}
+}
 }
