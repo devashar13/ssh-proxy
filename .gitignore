@@ -1,0 +1,11 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/ssh-proxy
+vendor/
+.idea/
+.vscode/
+*.swp
+.DS_Store
