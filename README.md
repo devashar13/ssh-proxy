@@ -4,6 +4,8 @@ A secure SSH proxy that sits between SSH clients and an upstream SSH server, log
 
 ## Quick Start (Docker)
 
+
+>> When you create the config, make sure that you set the parameters in the config before moving ahead
 ```bash
 # Clone the repository
 git clone https://github.com/devashar13/ssh-proxy.git
@@ -28,7 +30,7 @@ docker-compose logs -f
 ### Using password authentication:
 ```bash
 ssh -p 2022 user1@localhost
-# Enter password
+# Enter password as set in the config
 ```
 
 ### Using key-based authentication:
