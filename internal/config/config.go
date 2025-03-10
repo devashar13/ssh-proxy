@@ -65,7 +65,7 @@ func LoadYAML(path string) (*Config,error){
 		return nil, err
 	}
 	return &cfg, nil
-
+}
 
 
 func validate(cfg *Config) error{
@@ -96,5 +96,6 @@ func validate(cfg *Config) error{
 	if cfg.Logging.Directory == "" {
 		return fmt.Errorf("log directory not specified")
 	}
+	return nil
 }
-}
+
