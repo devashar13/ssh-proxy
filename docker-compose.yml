@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  ssh-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    ports:
+      - "2022:2022"
+    volumes:
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+    depends_on:
+      - ssh-server
+    networks:
+      - ssh-network
+
+  ssh-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "2222:22"
+    networks:
+      - ssh-network
+
+networks:
+  ssh-network:
+    driver: bridge
