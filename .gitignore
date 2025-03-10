@@ -12,3 +12,5 @@ vendor/
 configs/config.yaml
 /proxy
 configs/ssh_host_*
+logs/*
+

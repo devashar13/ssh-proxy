@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/devashar13/ssh-proxy/internal/config"
+	"github.com/devashar13/ssh-proxy/internal/llm"
 )
 
 type Session struct {
@@ -49,7 +50,22 @@ func NewSession(cfg *config.Config, username string, clientChannel ssh.Channel, 
 func (s *Session) Start() error {
 	defer s.clientChannel.Close()
 	defer s.upstreamConn.Close()
-	defer s.logFile.Close()
+	
+	// Get the logfile path before closing it
+	logFilePath := s.logFile.Name()
+	
+	// Use defer with a function to ensure logFile is closed before summarization
+	defer func() {
+		s.logFile.Close()
+		
+		// If LLM is enabled, summarize the session
+		if s.config.LLM.Enabled && s.config.LLM.APIKey != "" {
+			log.Printf("Initiating security summarization for session: %s", filepath.Base(logFilePath))
+			summarizer := llm.NewSummarizer(s.config)
+			summarizer.SummarizeSessionAsync(logFilePath)
+		}
+	}()
+	
 	log.Printf("Starting session for user %s", s.username)
 	upstreamChannel, upstreamReqs, err := s.upstreamConn.OpenChannel("session", nil)
 	if err != nil {
@@ -63,11 +79,6 @@ func (s *Session) Start() error {
 		_, err := io.Copy(upstreamChannel, stdinReader)
 		errCh <- err
 	}()
-	go func() {
-		_, err := io.Copy(s.clientChannel, upstreamChannel)
-		errCh <- err
-	}()
-
 	go func() {
 		_, err := io.Copy(s.clientChannel, upstreamChannel)
 		errCh <- err
