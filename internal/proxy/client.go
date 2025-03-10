@@ -77,3 +77,24 @@ func (c *UpstreamClient) createClientConfig() (*ssh.ClientConfig, error) {
 	}, nil
 }
 
+func (c *UpstreamClient) getAuthMethod() (ssh.AuthMethod, error) {
+	switch c.config.Upstream.Auth.Type {
+	case "password":
+		return ssh.Password(c.config.Upstream.Auth.Password), nil
+	case "publickey":
+		keyPath := c.config.Upstream.Auth.KeyPath
+		key, err := os.ReadFile(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read private key: %w", err)
+		}
+
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+
+		return ssh.PublicKeys(signer), nil
+	default:
+		return nil, fmt.Errorf("unsupported authentication type: %s", c.config.Upstream.Auth.Type)
+	}
+}
