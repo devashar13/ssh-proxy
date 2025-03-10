@@ -1,4 +1,3 @@
-// internal/llm/summarizer.go
 package llm
 
 import (
@@ -10,21 +9,25 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/devashar13/ssh-proxy/internal/config"
 )
 
+
 type Summarizer struct {
 	config *config.Config
 }
 
-// NewSummarizer creates a new summarizer instance
+
 func NewSummarizer(cfg *config.Config) *Summarizer {
 	return &Summarizer{
 		config: cfg,
 	}
 }
+
+
 func (s *Summarizer) SummarizeSessionAsync(logFilePath string) {
 	if !s.config.LLM.Enabled || s.config.LLM.APIKey == "" {
 		log.Printf("LLM summarization is disabled or API key is missing")
@@ -40,16 +43,23 @@ func (s *Summarizer) SummarizeSessionAsync(logFilePath string) {
 		}
 	}()
 }
+
+
 func (s *Summarizer) SummarizeSession(logFilePath string) error {
+	
 	logContent, err := os.ReadFile(logFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read log file: %w", err)
 	}
 
+	
+	cleanedContent := cleanLogContent(string(logContent))
+
+	
 	var summary string
 	switch s.config.LLM.Provider {
 	case "openai":
-		summary, err = s.callOpenAI(string(logContent))
+		summary, err = s.callOpenAI(cleanedContent)
 	default:
 		return fmt.Errorf("unsupported LLM provider: %s", s.config.LLM.Provider)
 	}
@@ -58,6 +68,7 @@ func (s *Summarizer) SummarizeSession(logFilePath string) error {
 		return fmt.Errorf("failed to generate summary: %w", err)
 	}
 
+	
 	summaryFilePath := logFilePath + ".summary"
 	err = os.WriteFile(summaryFilePath, []byte(summary), 0644)
 	if err != nil {
@@ -68,10 +79,27 @@ func (s *Summarizer) SummarizeSession(logFilePath string) error {
 }
 
 
+func cleanLogContent(content string) string {
+	
+	controlSeqPatterns := []string{
+		"\x1B\\[[0-9;]*[a-zA-Z]", 
+		"\x08",                   
+		"\x7F",                   
+	}
+	
+	cleanedContent := content
+	for _, pattern := range controlSeqPatterns {
+		re := regexp.MustCompile(pattern)
+		cleanedContent = re.ReplaceAllString(cleanedContent, "")
+	}
+	
+	return cleanedContent
+}
+
+
 func (s *Summarizer) callOpenAI(logContent string) (string, error) {
 	apiURL := "https://api.openai.com/v1/chat/completions"
 
-	// Create the prompt for security analysis
 	prompt := fmt.Sprintf(`
 Analyze the following SSH session log and provide a security assessment:
 
@@ -125,11 +153,11 @@ SSH Session Log:
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
 	}
+
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
-
 	choices, ok := result["choices"].([]interface{})
 	if !ok || len(choices) == 0 {
 		return "", fmt.Errorf("invalid response format")

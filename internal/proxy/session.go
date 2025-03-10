@@ -27,6 +27,51 @@ type Session struct {
 	mu            sync.Mutex
 }
 
+// Custom reader that cleans control characters when logging
+type cleaningReader struct {
+	r io.Reader
+	w io.Writer
+}
+
+func newCleaningReader(r io.Reader, w io.Writer) *cleaningReader {
+	return &cleaningReader{r: r, w: w}
+}
+
+func (cr *cleaningReader) Read(p []byte) (n int, err error) {
+	n, err = cr.r.Read(p)
+	if n > 0 {
+		// Clean control characters for logging
+		cleanedBytes := cleanControlChars(p[:n])
+		cr.w.Write(cleanedBytes)
+	}
+	return n, err
+}
+
+func cleanControlChars(data []byte) []byte {
+    var result []byte
+    for i := 0; i < len(data); i++ {
+        if data[i] == 0x08 || data[i] == 0x7F { 
+            
+            if len(result) > 0 {
+                result = result[:len(result)-1]
+            }
+        } else if data[i] == 0x1B && i+1 < len(data) && data[i+1] == '[' {
+            
+            j := i + 2
+            for j < len(data) && ((data[j] >= '0' && data[j] <= '9') || data[j] == ';') {
+                j++
+            }
+            if j < len(data) {
+                
+                i = j
+            }
+        } else if data[i] >= 32 || data[i] == '\n' || data[i] == '\t' || data[i] == '\r' {
+            
+            result = append(result, data[i])
+        }
+    }
+    return result
+}
 func NewSession(cfg *config.Config, username string, clientChannel ssh.Channel, clientReqs <-chan *ssh.Request) (*Session, error) {
 	logFile, err := createLogFile(cfg.Logging.Directory, username)
 	if err != nil {
@@ -72,13 +117,18 @@ func (s *Session) Start() error {
 		return fmt.Errorf("failed to open upstream channel: %w", err)
 	}
 	defer upstreamChannel.Close()
+	
 	go s.forwardRequests(upstreamChannel)
-	stdinReader := io.TeeReader(s.clientChannel, s.logFile)
+	
+	// Use the cleaning reader instead of a simple TeeReader
+	cleanReader := newCleaningReader(s.clientChannel, s.logFile)
+	
 	errCh := make(chan error, 2)
 	go func() {
-		_, err := io.Copy(upstreamChannel, stdinReader)
+		_, err := io.Copy(upstreamChannel, cleanReader)
 		errCh <- err
 	}()
+	
 	go func() {
 		_, err := io.Copy(s.clientChannel, upstreamChannel)
 		errCh <- err
@@ -126,8 +176,8 @@ func (s *Session) forwardRequests(upstreamChannel ssh.Channel) {
 
 func (s *Session) handleWindowChange(req *ssh.Request) {
 	var params struct {
-		Width  uint32
-		Height uint32
+		Width    uint32
+		Height   uint32
 		WidthPx  uint32
 		HeightPx uint32
 	}
@@ -181,7 +231,6 @@ func (s *Session) logExecRequest(req *ssh.Request) {
 	log.Printf("Exec requested: %s", params.Command)
 	fmt.Fprintf(s.logFile, "$ %s\n", params.Command)
 }
-
 
 func createLogFile(directory string, username string) (*os.File, error) {
 	if err := os.MkdirAll(directory, 0755); err != nil {
