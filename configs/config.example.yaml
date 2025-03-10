@@ -1,35 +1,36 @@
-
+# Server configuration
 server:
   port: 2022
-  host_key_path: "configs/host_key"
+  host_key_path: "./configs/ssh_host_ed25519_key"  # SSH host key
 
-# Upstream 
+# Upstream SSH server to connect to
 upstream:
-  host: "upstream"
-  port: 2222
-  username: "testuser"
+  host: "ssh-server"  
+  port: 22          
+  username: "admin"   
   auth:
     type: "password"
-    password: "testpassword"
+    password: "admin_password" 
 
-# Users allowed to connect to the proxy
 users:
+# example for password auth
   - username: "user1"
     auth:
       type: "password"
-      password: "password1"
-  - username: "user2"
+      password: "user1pass"
+# example for ssh-key based auth
+  - username: "keyuser"
     auth:
       type: "publickey"
-      key_path: "configs/authorized_keys/user2.pub"
+      key_path: "./configs/authorized_keys"
 
 # Logging configuration
 logging:
-  directory: "logs"
+  directory: "./logs"
 
-# LLM 
+# LLM Configuration (optional)
 llm:
-  enabled: false
-  api_key: ""
+  enabled: true
+  api_key: "openai-api-key"
   provider: "openai"
-  model: "gpt-3.5-turbo"
+  model: "gpt-4"
